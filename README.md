@@ -16,7 +16,7 @@ Assignment - CS765
 * Registration request by peer node triggers an event at the seed node to add an entry containing the peer’s IP and port number to the PL
 
 ## Gossip msg
-* Peer generates msg of the format: 
+Peer generates msg of the format: 
 `self.timestamp`:`self.IP`:`self.Msg#`
 
 ## liveliness msg
