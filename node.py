@@ -35,6 +35,11 @@ class Seed_Node (threading.Thread):
 	   	while not stop_server.is_set():
 	   		try:
 	      		conn, incoming_addr = self.server_sock.accept()
+
+	      		msg = self.recv_msg(conn)
+	      		if msg.split(":")[0] == "Peer Data":
+	      			incoming_addr = msg.split(":")[1] + ":" + msg.split(":")[2]
+
 	      		if incoming_addr not in self.client_list:
 	      			self.client_list.append(incoming_addr)
 	      			self.client_conn.append(conn)
@@ -43,12 +48,24 @@ class Seed_Node (threading.Thread):
 	      		msg = ""
 	      		for i in self.client_list:
 	      			msg = msg + i + " "
-	      		self.send(conn, msg)
+	      		self.send_msg(conn, msg)
 	      	except Exception as e:
 				self.stop_server.set()
 
-	def send(sock, msg):
+	def send_msg(self, sock, msg):
 		sock.send(msg)
+
+	def recv_msg(self, sock):
+    	msg = ""
+    	while True:
+    		data = sock.recv(MAXBUF)
+    		if not data: 
+            	print('Bye') 
+	            #lock.release() #check for lock 
+    	        break
+    	    msg = msg + data
+    	return msg
+
 
 
 class Peer_Node (threading.Thread):
@@ -143,7 +160,9 @@ class Peer_Node (threading.Thread):
     		ip = i.split(":")[0]
     		port = i.split(":")[1]
 			sock.connect((ip,port))
-			self.my_seeds.append(sock)
+			#self.my_seeds.append(sock)
+			msg = "Peer Data:" + self.ip + ":" + self.port
+			self.send(sock, msg)
 			client_list = ""
    			data = self.recv_msg(sock)
     	    client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
