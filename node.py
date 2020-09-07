@@ -72,6 +72,8 @@ class Peer_Node (threading.Thread):
 		self.make_socket()
 
 	def make_socket(self):
+		
+		print(self.ip,self.port)
 		self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.server_sock.bind((self.ip, self.port))		# Bind to the port
@@ -79,6 +81,7 @@ class Peer_Node (threading.Thread):
 
 		self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
 		self.client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.client_sock.bind((self.ip, self.port))		# Bind to the port
 
 		#write to file and register node
 
@@ -138,6 +141,7 @@ class Peer_Node (threading.Thread):
 		client_union = []		
 		for i in reg_list:
 			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			sock.bind((self.ip,self.port))
 			ip = i.split(":")[0]
 			port = i.split(":")[1]
 			sock.connect((ip,port))
@@ -154,6 +158,8 @@ class Peer_Node (threading.Thread):
 			client_union = Union(client_union, client_list.split(" "))
 
 			sock.close()
+
+		exit(0)
 
 		if (len(client_union)==0):
 			error #return client_union empty
