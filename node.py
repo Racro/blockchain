@@ -1,11 +1,14 @@
 import random
 import threading
 from datetime import datetime
+import socket
 
 filename = "config.txt"
-
+#Handle dead nodes
+#peer port is not same
 class Seed_Node (threading.Thread):
-	def __init__(self, ip, port, name):
+	def __init__(self, ip, port, name=""):
+
 		threading.Thread.__init__(self)
 		self.ip = ip
 		self.name = name
@@ -17,35 +20,30 @@ class Seed_Node (threading.Thread):
 
 	def init_seed_server(self):
 		self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
-        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.server_sock.bind((self.ip, self.port))        # Bind to the port
-		self.server_sock.listen(5)                 # Now wait for client connection (max 5 clients)
+		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.server_sock.bind((self.ip, self.port))		# Bind to the port
+		self.server_sock.listen(5)				 # Now wait for client connection (max 5 clients)
+
+
 	
 	def run(self):
-		def run(self):
 		print ("Starting " + self.name)
-		# Get lock to synchronize threads
-		#threadLock.acquire()
-		#print_time(self.name, self.counter, 3)
-		# Free lock to release next thread
-      	#threadLock.release()
-   
-	   	while not stop_server.is_set():
-	   		try:
-	      		conn, incoming_addr = self.server_sock.accept()
-	      		if incoming_addr not in self.client_list:
-	      			self.client_list.append(incoming_addr)
-	      			self.client_conn.append(conn)
+		while not self.stop_server.is_set():
+			try:
+				conn, incoming_addr = self.server_sock.accept()
+				msg = ""
+				for i in self.client_list:
+					msg = msg + i + " "
+					self.send(conn, msg)
 
-	      		#msg = clientlist
-	      		msg = ""
-	      		for i in self.client_list:
-	      			msg = msg + i + " "
-	      		self.send(conn, msg)
-	      	except Exception as e:
+				if incoming_addr not in self.client_list:
+					self.client_list.append(incoming_addr)
+					self.client_conn.append(conn)
+
+			except Exception as e:
 				self.stop_server.set()
 
-	def send(sock, msg):
+	def send(self,sock, msg):
 		sock.send(msg)
 
 
@@ -55,7 +53,7 @@ class Peer_Node (threading.Thread):
 		self.ip = ip
 		self.name = name
 		self.port = port
-		self.print_lock = threading.Lock()
+		# self.print_lock = threading.Lock()
 		self.MAXBUF = 1024
 
 		self.my_out_peer_info = []
@@ -75,12 +73,12 @@ class Peer_Node (threading.Thread):
 
 	def make_socket(self):
 		self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
-        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.server_sock.bind((self.ip, self.port))        # Bind to the port
-		self.server_sock.listen(5)                 # Now wait for client connection (max 5 clients)
+		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.server_sock.bind((self.ip, self.port))		# Bind to the port
+		self.server_sock.listen(5)				 # Now wait for client connection (max 5 clients)
 
 		self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
-        self.client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 		#write to file and register node
 
@@ -92,133 +90,135 @@ class Peer_Node (threading.Thread):
 		#threadLock.acquire()
 		#print_time(self.name, self.counter, 3)
 		# Free lock to release next thread
-      	#threadLock.release()
-      	try:
-	      	while not stop_server.is_set():
-	      		conn, incoming_addr = self.server_sock.accept()
+		#threadLock.release()
+		try:
+			while not stop_server.is_set():
+				conn, incoming_addr = self.server_sock.accept()
 
-	      		incoming_peer = PeerConnection(self, conn, incoming_addr)
-	      		incoming_peer.start()
-	      		self.my_in_peers.append(incoming_peer)
-	      		self.my_in_peer_info.append(incoming_addr)
-	      		#self.conn_to_ip[incoming_peer] = incoming_addr
-	      		if incoming_peer not in self.liveliness_count.keys():
-	      			self.liveliness_count[incoming_peer] = 0
+				incoming_peer = PeerConnection(self, conn, incoming_addr)
+				incoming_peer.start()
+				self.my_in_peers.append(incoming_peer)
+				self.my_in_peer_info.append(incoming_addr)
+				#self.conn_to_ip[incoming_peer] = incoming_addr
+				if incoming_peer not in self.liveliness_count.keys():
+					self.liveliness_count[incoming_peer] = 0
+		except:
+			pass
 
-    def register_with_peer(self, peer_list):
-    	for i in peer_list:
-    		if (i.split(":")[0]==self.ip || i.split(":")[1]==self.port):
-    			error("can't connect to same ip/port")
-    		if i in self.my_out_peer_info:
-    			error("already connected")
-    		self.connect_peer_node(i)
-    		self.my_out_peer_info.append(i)
+	def register_with_peer(self, peer_list):
+		for i in peer_list:
+			if (i.split(":")[0]==self.ip or i.split(":")[1]==self.port):
+				error("can't connect to same ip/port")
+			if i in self.my_out_peer_info:
+				error("already connected")
+			self.connect_peer_node(i)
+			self.my_out_peer_info.append(i)
 
-    def connect_peer_node(self, peer):
-    	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    	sock.connect((peer.split(":")[0], peer.split(":")[1]))
+	def connect_peer_node(self, peer):
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.connect((peer.split(":")[0], peer.split(":")[1]))
 
-    	peer_thread = PeerConnection(self, sock, peer)
-    	peer_thread.start()
-    	self.my_out_peers.append(peer_thread)
-    	if peer_thread not in self.liveliness_count.keys():
-    		self.liveliness_count[peer_thread] = 0
+		peer_thread = PeerConnection(self, sock, peer)
+		peer_thread.start()
+		self.my_out_peers.append(peer_thread)
+		if peer_thread not in self.liveliness_count.keys():
+			self.liveliness_count[peer_thread] = 0
 
-    def register_with seed(self):
-    	#get seed info - ["ip:port", ]
-    	seed_info = getcofig(filename)
-    	seed_size = len(seed_info)
-    	if (seed_size==0):
-    		error() #return seed empty
-    	else:
-    		reg_size = int(seed_size/2) + 1
-    		reg_list = random.sample(seed_info, reg_size)
-    	self.my_seed_info = reg_list
+	def register_with_seed(self):
+		#get seed info - ["ip:port", ]
+		seed_info = getcofig(filename)
+		seed_size = len(seed_info)
+		if (seed_size==0):
+			error() #return seed empty
+		else:
+			reg_size = int(seed_size/2) + 1
+			reg_list = random.sample(seed_info, reg_size)
+		self.my_seed_info = reg_list
 
-		client_union = []    	
-    	for i in reg_list:
-    		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    		ip = i.split(":")[0]
-    		port = i.split(":")[1]
+		client_union = []		
+		for i in reg_list:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			ip = i.split(":")[0]
+			port = i.split(":")[1]
 			sock.connect((ip,port))
 			self.my_seeds.append(sock)
 			client_list = ""
-    		while True:
-    			data = sock.recv(self.MAXBUF)
-    			if not data: 
-            		print('Bye') 
-	            	#lock.release() #check for lock 
-    	        	break
-    	        client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
+			while True:
+				data = sock.recv(self.MAXBUF)
+				if not data: 
+					print('Bye') 
+					#lock.release() #check for lock 
+					break
+				client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
 
-    	    client_union = Union(client_union, client_list.split(" "))
+			client_union = Union(client_union, client_list.split(" "))
 
-    	    sock.close()
+			sock.close()
 
-    	if (len(client_union)==0):
-    		error #return client_union empty
-    	elif (len(client_union) >= 4):
-    		my_out_peer_info = random.sample(client_union, 4)
-    	else:
-    		my_out_peer_info = random.sample(client_union, len(client_union))
-    	self.register_with_peer(my_out_peer_info)
+		if (len(client_union)==0):
+			error #return client_union empty
+		elif (len(client_union) >= 4):
+			my_out_peer_info = random.sample(client_union, 4)
+		else:
+			my_out_peer_info = random.sample(client_union, len(client_union))
+		self.register_with_peer(my_out_peer_info)
 
-    def connect(self, ip, port):
-    	self.client_sock.connect((ip,port))
+	def connect(self, ip, port):
+		self.client_sock.connect((ip,port))
 
-    def accept(self):
-    	conn, addr = self.server_sock.accept()
-    	#self.print_lock.acquire() 
-        self.print('Connected to :', addr[0], ':', addr[1]) 
-  
-        # Start a new thread and return its identifier 
-        return (conn, addr)
-        #start_new_thread(threaded, (c,)) 
+	def accept(self):
+		conn, addr = self.server_sock.accept()
+		#self.print_lock.acquire() 
+		self.print('Connected to :', addr[0], ':', addr[1]) 
 
-    def recv_msg(self, sock, lock):
-    	msg = ""
-    	while True:
-    		data = sock.recv(MAXBUF)
-    		if not data: 
-            	print('Bye') 
-	            #lock.release() #check for lock 
-    	        break
-    	    msg = msg + data
-    	return msg
+		# Start a new thread and return its identifier 
+		return (conn, addr)
+		#start_new_thread(threaded, (c,)) 
 
-   	def send_msg(self, sock, msg):
-    	sock.send(msg)
+	def recv_msg(self, sock, lock):
+		msg = ""
+		while True:
+			data = sock.recv(MAXBUF)
+			if not data: 
+				print('Bye') 
+				#lock.release() #check for lock 
+				break
+			msg = msg + data
+		return msg
 
-    def send_all (self, msg, exclude=[]):
-    	for i in self.my_in_peers:
-    		if i.peer_address not in exclude:
-    			i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
-    	for i in self.my_out_peers:
-    		if i.peer_address not in exclude:
-    			i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
+	def send_msg(self, sock, msg):
+		sock.send(msg)
 
-    def check_liveliness (self):
-    	while(true):
-    		time.sleep(13)
-    		to_remove = 0
-    		for i in self.liveliness_count:
-    			if (self.liveliness_count[i] >= 3):
-    				#close conn
+	def send_all (self, msg, exclude=[]):
+		for i in self.my_in_peers:
+			if i.peer_address not in exclude:
+				i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
+		for i in self.my_out_peers:
+			if i.peer_address not in exclude:
+				i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
 
-    				to_remove = i
-    				for addr in reg_list:
-    					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			    		ip = addr.split(":")[0]
-			    		port = addr.split(":")[1]
+	def check_liveliness (self):
+		while(true):
+			time.sleep(13)
+			to_remove = 0
+			for i in self.liveliness_count:
+				if (self.liveliness_count[i] >= 3):
+					#close conn
+
+					to_remove = i
+					for addr in reg_list:
+						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+						ip = addr.split(":")[0]
+						port = addr.split(":")[1]
 						sock.connect((ip,port))
 						self.send_msg(sock, form_deadNode_msg(i.peer_address, self.ip))
-			    	    sock.close()
+						sock.close()
 
 			if to_remove != 0:
 				del self.liveliness_count[to_remove]
-    		for i in self.liveliness_count:
-    			self.liveliness_count[i] = self.liveliness_count[i] + 1
-    		self.send_all(form_liveliness_req(self.ip))
+			for i in self.liveliness_count:
+				self.liveliness_count[i] = self.liveliness_count[i] + 1
+			self.send_all(form_liveliness_req(self.ip))
 
 
 
@@ -231,49 +231,51 @@ class PeerConnection (threading.Thread):
 		self.stop_server = threading.Event()
 
 	def run(self):
-      	while not stop_server.is_set():
-      		try:
-	      		msg = self.recv_msg(self.peer_conn)
-	      		if self.liveliness_req(msg):
-	      			#reply
-	      			reply = form_liveliness_reply(msg.split(":")[1], msg.split(":")[2], self.server.ip)
-	      			self.send_msg(self.peer_conn, reply)
+		while not stop_server.is_set():
+			try:
+				msg = self.recv_msg(self.peer_conn)
+				if self.liveliness_req(msg):
+					#reply
+					reply = form_liveliness_reply(msg.split(":")[1], msg.split(":")[2], self.server.ip)
+					self.send_msg(self.peer_conn, reply)
 
-	      		elif self.liveliness_reply(msg):
-	      			#reply
-	      			self.server.liveliness_count[msg.split(":")[3]] = 0
+				elif self.liveliness_reply(msg):
+					#reply
+					self.server.liveliness_count[msg.split(":")[3]] = 0
 
-	      		elif self.gossip(msg):
-	      			#reply
-	      			message = msg.split(":")[2]
-	      			md5 = hashlib.md5(message.encode()).hexdigest()
-	      			self.server.lock.acquire()
-	      			if md5 not in self.server.ML.keys():
-	      				self.server.ML[md5] = msg
+				elif self.gossip(msg):
+					#reply
+					message = msg.split(":")[2]
+					md5 = hashlib.md5(message.encode()).hexdigest()
+					self.server.lock.acquire()
+					if md5 not in self.server.ML.keys():
+						self.server.ML[md5] = msg
 
-	      				#write to file
+						#write to file
 
-	      				exclude = []
-	      				exclude.append(self.peer_address)
-	      				self.server.send_all(message, exclude)
-	      			self.server.lock.release()
-	      		else:
-	      			#error(invalid format)
-	      		#write to file
+						exclude = []
+						exclude.append(self.peer_address)
+						self.server.send_all(message, exclude)
+					self.server.lock.release()
+				else:
+					error("invalid format")
+			except:
+				error("invalid format")
 
-	def liveliness_req(msg):
+
+	def liveliness_req(self,msg):
 		if (msg.split(":")[0] == "Alive?"):
 			return True
 		else:
 			return False
 
-	def liveliness_reply(msg):
+	def liveliness_reply(self,msg):
 		if (msg.split(":")[0] == "Yes, Alive"):
 			return True
 		else:
 			return False
 
-	def gossip(msg):
+	def gossip(self,msg):
 		check=0
 		try:
 			time = datetime.strptime(msg.split(":")[0], '%Y-%m-%d %H:%M:%S.%f')
@@ -282,30 +284,38 @@ class PeerConnection (threading.Thread):
 			check=0
 		return check
 	def recv_msg(self, sock):
-    	msg = ""
-    	while True:
-    		data = sock.recv(MAXBUF)
-    		if not data: 
-            	print('Bye') 
-	            #lock.release() #check for lock 
-    	        break
-    	    msg = msg + data
-    	return msg
+		msg = ""
+		while True:
+			data = sock.recv(MAXBUF)
+			if not data: 
+				print('Bye') 
+				#lock.release() #check for lock 
+				break
+			msg = msg + data
+		return msg
 
 	def send_msg(self, msg):
 		try:
 			self.peer_conn.send(msg)
+		except:
+			error()
 			
 def get_config(filename):
 	with open(filename, "r") as f:
-		check = 0
 		seed_info=[]
 		for line in f:
-			if (check==1):
-				seed_info.append(line)
-			if (line == "__SEED__"):
-				check=1
+			seed_info.append(line.strip())
 	return seed_info
+
+	# with open(filename, "r") as f:
+	# 	check = 0
+	# 	seed_info=[]
+	# 	for line in f:
+	# 		if (check==1):
+	# 			seed_info.append(line)
+	# 		if (line == "__SEED__"):
+	# 			check=1
+	# return seed_info
 
 def Union(lst1, lst2):
 	final_list = list(set(lst1) | set(lst2))
