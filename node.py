@@ -40,16 +40,20 @@ class Seed_Node (threading.Thread):
 	      		if msg.split(":")[0] == "Peer Data":
 	      			incoming_addr = msg.split(":")[1] + ":" + msg.split(":")[2]
 
-	      		if incoming_addr not in self.client_list:
-	      			self.client_list.append(incoming_addr)
-	      			self.client_conn.append(conn)
+		      		if incoming_addr not in self.client_list:
+		      			self.client_list.append(incoming_addr)
+	    	  			self.client_conn.append(conn)
+	    	  		#msg = clientlist
+		      		msg = ""
+		      		for i in self.client_list:
+		      			msg = msg + i + " "
+		      		self.send_msg(conn, msg)
 
-	      		#msg = clientlist
-	      		msg = ""
-	      		for i in self.client_list:
-	      			msg = msg + i + " "
-	      		self.send_msg(conn, msg)
-	      	except Exception as e:
+	    	  	elif msg.split(":")[0] == "Dead Node":
+	    	  		incoming_addr = msg.split(":")[1]
+	    	  		if incoming_addr in self.client_list:
+	    	  			self.client_list.remove(incoming_addr)
+			except Exception as e:
 				self.stop_server.set()
 
 	def send_msg(self, sock, msg):
