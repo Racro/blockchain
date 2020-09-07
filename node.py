@@ -145,13 +145,8 @@ class Peer_Node (threading.Thread):
 			sock.connect((ip,port))
 			self.my_seeds.append(sock)
 			client_list = ""
-    		while True:
-    			data = sock.recv(self.MAXBUF)
-    			if not data: 
-            		print('Bye') 
-	            	#lock.release() #check for lock 
-    	        	break
-    	        client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
+   			data = self.recv_msg(sock)
+    	    client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
 
     	    client_union = Union(client_union, client_list.split(" "))
 
@@ -177,7 +172,7 @@ class Peer_Node (threading.Thread):
         return (conn, addr)
         #start_new_thread(threaded, (c,)) 
 
-    def recv_msg(self, sock, lock):
+    def recv_msg(self, sock):
     	msg = ""
     	while True:
     		data = sock.recv(MAXBUF)
