@@ -4,6 +4,7 @@ from datetime import datetime
 import socket
 
 filename = "config.txt"
+MAXBUF = 1024
 #Handle dead nodes
 #peer port is not same
 class Seed_Node (threading.Thread):
@@ -14,7 +15,7 @@ class Seed_Node (threading.Thread):
 		self.name = name
 		self.port = port
 		self.client_list = []
-		self.client_conn = []
+		# self.client_conn = []
 		self.stop_server = threading.Event()
 		self.init_seed_server()
 
@@ -24,28 +25,54 @@ class Seed_Node (threading.Thread):
 		self.server_sock.bind((self.ip, self.port))		# Bind to the port
 		self.server_sock.listen(5)				 # Now wait for client connection (max 5 clients)
 
-
-	
 	def run(self):
 		print ("Starting " + self.name)
 		while not self.stop_server.is_set():
 			try:
 				conn, incoming_addr = self.server_sock.accept()
-				msg = ""
-				for i in self.client_list:
-					msg = msg + i + " "
-					self.send(conn, msg)
+				print(self.name + " received con from: ", incoming_addr)
 
-				if incoming_addr not in self.client_list:
-					self.client_list.append(incoming_addr)
-					self.client_conn.append(conn)
+				msg = self.recv_msg(conn)
+				if msg.split(":")[0] == "Peer Data":
+					incoming_addr = (str(msg.split(":")[1]),int(msg.split(":")[2])) #strored as tuple
+					print("Got From peer ",incoming_addr)
+					
+					msg = ""
+					for i in self.client_list:
+						msg = msg + i[0] + ":" + str(i[1]) + " "
+					
+					self.send_info(msg,incoming_addr)
+
+					if incoming_addr not in self.client_list:
+						self.client_list.append(incoming_addr)
+
+
+				elif msg.split(":")[0] == "Dead Node":
+					incoming_addr = msg.split(":")[1]
+					if incoming_addr in self.client_list:
+						self.client_list.remove(incoming_addr)
 
 			except Exception as e:
+				print(repr(e))
+				print("Foo")
 				self.stop_server.set()
 
-	def send(self,sock, msg):
-		sock.send(msg)
+	def send_info(self, msg,addr):
+		# print("preparing to sned peer info",msg,addr)
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			s.connect(addr)
+			s.sendall(msg.encode('utf-8'))
 
+	def recv_msg(self, sock):
+		msg = ""
+		while True:
+			data = sock.recv(MAXBUF)
+			if not data: 
+				break
+			# print(repr(data))
+			msg+=data.decode('utf-8')
+		
+		return msg
 
 class Peer_Node (threading.Thread):
 	def __init__(self, ip, port, name):
@@ -63,7 +90,7 @@ class Peer_Node (threading.Thread):
 		self.my_out_peers = []
 		self.my_in_peers = []
 
-		self.lock = threading.Lock()
+		# self.lock = threading.Lock()
 		self.stop_server = threading.Event()
 
 		self.liveliness_count = {}
@@ -81,55 +108,14 @@ class Peer_Node (threading.Thread):
 
 		self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP echo socket
 		self.client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.client_sock.bind((self.ip, self.port))		# Bind to the port
 
 		#write to file and register node
-
 		self.register_with_seed()
-
-	def run(self):
-		print ("Starting " + self.name)
-		# Get lock to synchronize threads
-		#threadLock.acquire()
-		#print_time(self.name, self.counter, 3)
-		# Free lock to release next thread
-		#threadLock.release()
-		try:
-			while not stop_server.is_set():
-				conn, incoming_addr = self.server_sock.accept()
-
-				incoming_peer = PeerConnection(self, conn, incoming_addr)
-				incoming_peer.start()
-				self.my_in_peers.append(incoming_peer)
-				self.my_in_peer_info.append(incoming_addr)
-				#self.conn_to_ip[incoming_peer] = incoming_addr
-				if incoming_peer not in self.liveliness_count.keys():
-					self.liveliness_count[incoming_peer] = 0
-		except:
-			pass
-
-	def register_with_peer(self, peer_list):
-		for i in peer_list:
-			if (i.split(":")[0]==self.ip or i.split(":")[1]==self.port):
-				error("can't connect to same ip/port")
-			if i in self.my_out_peer_info:
-				error("already connected")
-			self.connect_peer_node(i)
-			self.my_out_peer_info.append(i)
-
-	def connect_peer_node(self, peer):
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		sock.connect((peer.split(":")[0], peer.split(":")[1]))
-
-		peer_thread = PeerConnection(self, sock, peer)
-		peer_thread.start()
-		self.my_out_peers.append(peer_thread)
-		if peer_thread not in self.liveliness_count.keys():
-			self.liveliness_count[peer_thread] = 0
+		self.register_with_peer()
+		
 
 	def register_with_seed(self):
-		#get seed info - ["ip:port", ]
-		seed_info = getcofig(filename)
+		seed_info = get_config(filename)
 		seed_size = len(seed_info)
 		if (seed_size==0):
 			error() #return seed empty
@@ -140,34 +126,76 @@ class Peer_Node (threading.Thread):
 
 		client_union = []		
 		for i in reg_list:
-			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			sock.bind((self.ip,self.port))
-			ip = i.split(":")[0]
-			port = i.split(":")[1]
-			sock.connect((ip,port))
-			self.my_seeds.append(sock)
-			client_list = ""
-			while True:
-				data = sock.recv(self.MAXBUF)
-				if not data: 
-					print('Bye') 
-					#lock.release() #check for lock 
-					break
-				client_list = client_list + data #received as string - "ip1:port1 ip2:port2 ..."
+			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+				ip = i.split(":")[0]
+				port = int(i.split(":")[1])
+				sock.connect((ip,port))
+				reg_msg = "Peer Data:" + str(self.ip) + ":" + str(self.port)
+				sock.sendall(reg_msg.encode('utf-8'))
 
+			#Now recive data on listner port named server sock
+			conn, addr = self.server_sock.accept()
+
+			print('rec reg',addr)
+			client_list = self.recv_msg(conn)
 			client_union = Union(client_union, client_list.split(" "))
 
-			sock.close()
-
-		exit(0)
-
+		print("Number of peers returned:",len(client_union))
+		print(client_union)
 		if (len(client_union)==0):
-			error #return client_union empty
+			self.my_out_peer_info = []
 		elif (len(client_union) >= 4):
-			my_out_peer_info = random.sample(client_union, 4)
+			self.my_out_peer_info = random.sample(client_union, 4)
 		else:
-			my_out_peer_info = random.sample(client_union, len(client_union))
-		self.register_with_peer(my_out_peer_info)
+			self.my_out_peer_info = random.sample(client_union, len(client_union))
+		
+	def register_with_peer(self):
+		if len(self.my_out_peer_info) ==0:
+			return
+
+		for i in self.my_out_peer_info:
+			print(i)
+			if (i.split(":")[0]==self.ip and i.split(":")[1]==self.port):
+				error("can't connect to same ip/port")
+			# if i in self.my_out_peer_info:
+			# 	error("already connected")
+			# self.connect_peer_node(i)
+			# self.my_out_peer_info.append(i)
+
+	def run(self):
+		print ("Starting " + self.name)
+		
+		# Get lock to synchronize threads
+		#threadLock.acquire()
+		#print_time(self.name, self.counter, 3)
+		# Free lock to release next thread
+		#threadLock.release()
+		try:
+			while not self.stop_server.is_set():
+				conn, incoming_addr = self.server_sock.accept()
+
+				print("lol")
+				# incoming_peer = PeerConnection(self, conn, incoming_addr)
+				# incoming_peer.start()
+				# self.my_in_peers.append(incoming_peer)
+				# self.my_in_peer_info.append(incoming_addr)
+				# #self.conn_to_ip[incoming_peer] = incoming_addr
+				# if incoming_peer not in self.liveliness_count.keys():
+				# 	self.liveliness_count[incoming_peer] = 0
+		except:
+			pass
+
+	
+
+	def connect_peer_node(self, peer):
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.connect((peer.split(":")[0], int(peer.split(":")[1])))
+
+		peer_thread = PeerConnection(self, sock, peer)
+		peer_thread.start()
+		self.my_out_peers.append(peer_thread)
+		if peer_thread not in self.liveliness_count.keys():
+			self.liveliness_count[peer_thread] = 0
 
 	def connect(self, ip, port):
 		self.client_sock.connect((ip,port))
@@ -181,15 +209,13 @@ class Peer_Node (threading.Thread):
 		return (conn, addr)
 		#start_new_thread(threaded, (c,)) 
 
-	def recv_msg(self, sock, lock):
+	def recv_msg(self, sock, lock=None):
 		msg = ""
 		while True:
 			data = sock.recv(MAXBUF)
 			if not data: 
-				print('Bye') 
-				#lock.release() #check for lock 
 				break
-			msg = msg + data
+			msg = msg + data.decode('utf-8')
 		return msg
 
 	def send_msg(self, sock, msg):
@@ -237,7 +263,7 @@ class PeerConnection (threading.Thread):
 		self.stop_server = threading.Event()
 
 	def run(self):
-		while not stop_server.is_set():
+		while not self.stop_server.is_set():
 			try:
 				msg = self.recv_msg(self.peer_conn)
 				if self.liveliness_req(msg):
@@ -324,6 +350,7 @@ def get_config(filename):
 	# return seed_info
 
 def Union(lst1, lst2):
+	lst2 = [i for i in lst2 if i]
 	final_list = list(set(lst1) | set(lst2))
 	return final_list 
 
@@ -349,3 +376,6 @@ def form_deadNode_msg(addr, self_ip):
 	t = datetime.now()
 	msg = msg + ":" + addr + ":" + str(t) + self_ip
 	return msg 
+
+def error(msg):
+	print(msg)
