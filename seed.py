@@ -1,4 +1,5 @@
 from node import Seed_Node, get_config
+filename = "config.txt"
 
 seed_info = get_config(filename)
 

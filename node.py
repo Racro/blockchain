@@ -1,6 +1,8 @@
 import random
 import threading
+from datetime import datetime
 
+filename = "config.txt"
 
 class Seed_Node (threading.Thread):
 	def __init__(self, ip, port, name):
@@ -33,10 +35,13 @@ class Seed_Node (threading.Thread):
 	      		conn, incoming_addr = self.server_sock.accept()
 	      		if incoming_addr not in self.client_list:
 	      			self.client_list.append(incoming_addr)
-	      			self.client_conn,append(conn)
+	      			self.client_conn.append(conn)
 
-	      			#msg = clientlist
-	      			self.send(conn, msg)
+	      		#msg = clientlist
+	      		msg = ""
+	      		for i in self.client_list:
+	      			msg = msg + i + " "
+	      		self.send(conn, msg)
 	      	except Exception as e:
 				self.stop_server.set()
 
@@ -59,7 +64,11 @@ class Peer_Node (threading.Thread):
 		self.my_out_peers = []
 		self.my_in_peers = []
 
+		self.lock = threading.Lock()
 		self.stop_server = threading.Event()
+
+		self.ML = {}
+		#self.conn_to_ip = {}
 		self.make_socket()
 
 	def make_socket(self):
@@ -88,8 +97,9 @@ class Peer_Node (threading.Thread):
 
 	      		incoming_peer = PeerConnection(self, conn, incoming_addr)
 	      		incoming_peer.start()
-	      		self.my_in_peers.append(conn)
+	      		self.my_in_peers.append(incoming_peer)
 	      		self.my_in_peer_info.append(incoming_addr)
+	      		#self.conn_to_ip[incoming_peer] = incoming_addr
       		
 
     def register_with_peer(self, peer_list):
@@ -153,7 +163,7 @@ class Peer_Node (threading.Thread):
 
     def accept(self):
     	conn, addr = self.server_sock.accept()
-    	self.print_lock.acquire() 
+    	#self.print_lock.acquire() 
         self.print('Connected to :', addr[0], ':', addr[1]) 
   
         # Start a new thread and return its identifier 
@@ -174,11 +184,13 @@ class Peer_Node (threading.Thread):
    	def send_msg(self, sock, msg):
     	sock.send(msg)
 
-    def send_all (self, msg):
+    def send_all (self, msg, exclude=[]):
     	for i in self.my_in_peers:
-    		i.send(msg)
+    		if i.peer_address not in exclude:
+    			i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
     	for i in self.my_out_peers:
-    		i.send(msg)
+    		if i.peer_address not in exclude:
+    			i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
 
 class PeerConnection (threading.Thread):
 	def __init__(self, server, connection, address):
@@ -191,9 +203,49 @@ class PeerConnection (threading.Thread):
 	def run(self):
       	while not stop_server.is_set():
       		try:
-	      		self.recv_msg(self.peer_conn)
+	      		msg = self.recv_msg(self.peer_conn)
+	      		if self.liveliness_req(msg):
+	      			#reply
+	      		elif self.liveliness_reply(msg):
+	      			#reply
+	      		elif self.gossip(msg):
+	      			#reply
+	      			message = msg.split(":")[2]
+	      			md5 = hashlib.md5(message.encode()).hexdigest()
+	      			self.server.lock.acquire()
+	      			if md5 not in self.server.ML.keys():
+	      				self.server.ML[md5] = msg
+
+	      				#write to file
+
+	      				exclude = []
+	      				exclude.append(self.peer_address)
+	      				self.server.send_all(message, exclude)
+	      			self.server.lock.release()
+	      		else:
+	      			#error(invalid format)
 	      		#write to file
 
+	def liveliness_req(msg):
+		if (msg.split(":")[0] == "Alive?"):
+			return True
+		else:
+			return False
+
+	def liveliness_reply(msg):
+		if (msg.split(":")[0] == "Yes, Alive"):
+			return True
+		else:
+			return False
+
+	def gossip(msg):
+		check=0
+		try:
+			time = datetime.strptime(msg.split(":")[0], '%Y-%m-%d %H:%M:%S.%f')
+			check=1
+		except:
+			check=0
+		return check
 	def recv_msg(self, sock):
     	msg = ""
     	while True:
@@ -223,3 +275,9 @@ def get_config(filename):
 def Union(lst1, lst2):
 	final_list = list(set(lst1) | set(lst2))
 	return final_list 
+
+def form_gossip_msg(ip, message):
+	msg = ""
+	t = datetime.now()
+	msg = msg + str(t) + ":" + ip + ":" + message
+	return msg
