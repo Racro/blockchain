@@ -61,12 +61,14 @@ class Peer_Node (threading.Thread):
 		self.my_out_peer_info = []
 		self.my_in_peer_info = []
 		self.my_seed_info = []
+		self.my_seeds = []
 		self.my_out_peers = []
 		self.my_in_peers = []
 
 		self.lock = threading.Lock()
 		self.stop_server = threading.Event()
 
+		self.liveliness_count = {}
 		self.ML = {}
 		#self.conn_to_ip = {}
 		self.make_socket()
@@ -100,7 +102,8 @@ class Peer_Node (threading.Thread):
 	      		self.my_in_peers.append(incoming_peer)
 	      		self.my_in_peer_info.append(incoming_addr)
 	      		#self.conn_to_ip[incoming_peer] = incoming_addr
-      		
+	      		if incoming_peer not in self.liveliness_count.keys():
+	      			self.liveliness_count[incoming_peer] = 0
 
     def register_with_peer(self, peer_list):
     	for i in peer_list:
@@ -118,13 +121,15 @@ class Peer_Node (threading.Thread):
     	peer_thread = PeerConnection(self, sock, peer)
     	peer_thread.start()
     	self.my_out_peers.append(peer_thread)
+    	if peer_thread not in self.liveliness_count.keys():
+    		self.liveliness_count[peer_thread] = 0
 
     def register_with seed(self):
     	#get seed info - ["ip:port", ]
     	seed_info = getcofig(filename)
     	seed_size = len(seed_info)
     	if (seed_size==0):
-    		error #return seed empty
+    		error() #return seed empty
     	else:
     		reg_size = int(seed_size/2) + 1
     		reg_list = random.sample(seed_info, reg_size)
@@ -136,7 +141,7 @@ class Peer_Node (threading.Thread):
     		ip = i.split(":")[0]
     		port = i.split(":")[1]
 			sock.connect((ip,port))
-
+			self.my_seeds.append(sock)
 			client_list = ""
     		while True:
     			data = sock.recv(self.MAXBUF)
@@ -192,6 +197,31 @@ class Peer_Node (threading.Thread):
     		if i.peer_address not in exclude:
     			i.send(i.peer_conn, form_gossip_msg(i.split(":")[0], msg))
 
+    def check_liveliness (self):
+    	while(true):
+    		time.sleep(13)
+    		to_remove = 0
+    		for i in self.liveliness_count:
+    			if (self.liveliness_count[i] >= 3):
+    				#close conn
+
+    				to_remove = i
+    				for addr in reg_list:
+    					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			    		ip = addr.split(":")[0]
+			    		port = addr.split(":")[1]
+						sock.connect((ip,port))
+						self.send_msg(sock, form_deadNode_msg(i.peer_address, self.ip))
+			    	    sock.close()
+
+			if to_remove != 0:
+				del self.liveliness_count[to_remove]
+    		for i in self.liveliness_count:
+    			self.liveliness_count[i] = self.liveliness_count[i] + 1
+    		self.send_all(form_liveliness_req(self.ip))
+
+
+
 class PeerConnection (threading.Thread):
 	def __init__(self, server, connection, address):
 		threading.Thread.__init__(self)
@@ -206,8 +236,13 @@ class PeerConnection (threading.Thread):
 	      		msg = self.recv_msg(self.peer_conn)
 	      		if self.liveliness_req(msg):
 	      			#reply
+	      			reply = form_liveliness_reply(msg.split(":")[1], msg.split(":")[2], self.server.ip)
+	      			self.send_msg(self.peer_conn, reply)
+
 	      		elif self.liveliness_reply(msg):
 	      			#reply
+	      			self.server.liveliness_count[msg.split(":")[3]] = 0
+
 	      		elif self.gossip(msg):
 	      			#reply
 	      			message = msg.split(":")[2]
@@ -281,3 +316,20 @@ def form_gossip_msg(ip, message):
 	t = datetime.now()
 	msg = msg + str(t) + ":" + ip + ":" + message
 	return msg
+
+def form_liveliness_req(ip):
+	req = "Alive?"
+	t = datetime.now()
+	req = req + ":" + str(t) + ":" + ip
+	return req
+
+def form_liveliness_reply(t, sender_ip, self_ip):
+	req = "Yes, Alive"
+	req = req + ":" + str(t) + ":" + sender_ip + ":" + self_ip
+	return req
+
+def form_deadNode_msg(addr, self_ip):
+	msg = "Dead Node"
+	t = datetime.now()
+	msg = msg + ":" + addr + ":" + str(t) + self_ip
+	return msg 
