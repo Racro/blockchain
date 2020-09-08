@@ -1,17 +1,33 @@
 from datetime import datetime
 from node import Peer_Node
+import argparse
 
 ip = "127.0.0.1"
-port = 2005
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--port_list',  type=str, help='Port list')
+parser.add_argument('--msg_list',  type=str, help='Port list')
+
+parser.add_argument('--sum', dest='accumulate', action='store_const',
+                    const=sum, default=max,
+                    help='sum the integers (default: find the max)')
+
 message = "Hello"
 
-peer_interval = 5
-num_peer = 4
+port = int(input("port: "))
+
+peer_interval = 5 
+num_peer = 1
 peer_list=[]
+
 
 for i in range(num_peer):
 	print(i)
-	node = Peer_Node(ip, port+i, message, "Peer"+str(i))
+
+	file = open("Peer"+str(i)+".txt",'w')
+	file.close()
+
+	node = Peer_Node(ip, port, message + str(i), "Peer"+str(i))
 	node.start()
 	peer_list.append(node)
 

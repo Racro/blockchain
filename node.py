@@ -40,11 +40,14 @@ class Seed_Node (threading.Thread):
 
 				try:
 					msg = self.recv_msg(conn)
+
+					# print(msg)
 					if msg.split(":")[0] == "Register":
 						incoming_addr = (str(msg.split(":")[1]),int(msg.split(":")[2])) #strored as tuple
 						write_to_terminal(msg)
 						write_to_file(self.file, msg)
 						
+						print(incoming_addr)
 						msg = ""
 						for i in self.client_list:
 							msg = msg + i[0] + ":" + str(i[1]) + " "
@@ -79,11 +82,11 @@ class Seed_Node (threading.Thread):
 
 	def send_msg(self, msg,addr):
 		# print("preparing to sned peer info",msg,addr)
+
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.connect(addr)
 			s.sendall(msg.encode('utf-8'))	
-		s.close()
 
 	def recv_msg(self, sock):
 		msg = ""
@@ -110,10 +113,12 @@ class Peer_Node (threading.Thread):
 		self.seed_info = []
 		
 		self.file = name + ".txt"
-		# self.lock = threading.Lock()
+		self.lock = threading.Lock()
 		self.stop_server = threading.Event()
 		self.liveliness_count = {}
 		self.ML = {}
+
+		self.peer_threads = []
 		#self.conn_to_ip = {}
 		self.make_socket()
 
@@ -153,6 +158,8 @@ class Peer_Node (threading.Thread):
 			
 			#Now receive existing peer data on listner port named server sock
 			conn, addr = self.server_sock.accept()
+			# print("here")
+			
 			client_list = self.recv_msg(conn)
 			if (client_list.split("-")[0]=="ClientList"):
 				write_to_terminal(client_list)
@@ -185,10 +192,13 @@ class Peer_Node (threading.Thread):
 		#start gossip
 		peer_gossip_thread = PeerConnection(self,0)
 		peer_gossip_thread.start()
-		self.peer_threads.append(peer_gossip_thread)		
+		# self.peer_threads.append(peer_gossip_thread)		
+		
 		# start liveliness
-		# peer_liveliness_thread = PeerConnection(self, peer, 1)
-		# peer_liveliness_thread.start()
+		peer_liveliness_thread = PeerConnection(self,1)
+		peer_liveliness_thread.start()
+		self.peer_threads.append(peer_liveliness_thread)		
+
 
 		# if peer not in self.liveliness_count.keys():
 		# 	self.liveliness_count[peer] = 0
@@ -210,13 +220,14 @@ class Peer_Node (threading.Thread):
 							self.peer_info.append(addr)
 
 					elif self.liveliness_req(msg):
-						#reply
-						reply = form_liveliness_reply(msg.split(":")[1], msg.split(":")[2], self.ip)
-						self.send_msg(reply, incoming_addr)
+						#reply 
+						reply = form_liveliness_reply(msg.split(":")[1], msg.split(":")[2], self.addr)
+						addr = (msg.split(":")[2], int(msg.split(":")[3]))
+						self.send_msg(reply, addr)
 
 					elif self.liveliness_reply(msg):
 						#reply
-						self.server.liveliness_count[msg.split(":")[3]] = 0
+						self.liveliness_count[msg.split(":")[3]+":"+msg.split(":")[4]] = 0
 
 					elif self.gossip(msg):
 						#reply
@@ -320,52 +331,78 @@ class PeerConnection (threading.Thread):
 		self.flag = flag
 		self.stop_server = threading.Event()
 		
-		self.gossip_interval = 10
+		self.gossip_interval = 5
 		self.liveliness_interval = 13
-		
+
 
 	def run(self):
 		
 		if self.flag == 0:
 			for i in range(10):
 				msg = form_gossip_msg(self.addr, self.server.message)
-				self.server.broadcast(msg)
+				
+				try:
+					self.server.lock.acquire()
+					self.server.broadcast(msg)
+					self.server.lock.release()
+
+				except:
+					# self.server.lock.acquire()
+					self.server.lock.release()
+					error("coudn't send gossip")
+					# self.server.lock.release()
+					
 				time.sleep(self.gossip_interval)
 
 		elif self.flag == 1:
 			while True:
-				msg = form_liveliness_msg(self.server.addr)
-				self.server.send_all(msg)
+				msg = form_liveliness_req(self.server.addr)
+				print(msg)
+				try:
+					self.server.lock.acquire()
+					self.server.broadcast(msg)
+					self.server.lock.release()
+				except:
+					self.server.lock.release()
+					error("coudn't send liveliness")
+
 				time.sleep(self.liveliness_interval)
-				check_liveliness()				
+				self.check_liveliness()				
 		else:
 			error("wrong flag")
 
 	def check_liveliness (self):
+			print(self.server.peer_info)
 			to_remove = []
 			for i in self.server.liveliness_count:
-				if (self.liveliness_count[i] >= 3):
-					#close conn
+				if (self.server.liveliness_count[i] >= 3):
 
 					to_remove.append(i)
-					for addr in self.server.my_seed_info:
-						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-						sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+					
+					for addr in self.server.seed_info:
+						
 						ip = addr.split(":")[0]
 						port = addr.split(":")[1]
-						sock.connect((ip,port))
-						self.send_msg(sock, form_deadNode_msg(i, self.addr))
+						addr_tup = (ip,int(port))
+						self.send_msg(form_deadNode_msg(i, self.addr),addr_tup)
 						write_to_terminal(form_deadNode_msg(i, self.addr))
 						write_to_file(self.server.file, form_deadNode_msg(i, self.addr))
-						sock.close()
-
+						
 			if len(to_remove) != 0:
 				for i in to_remove:
-					del self.liveliness_count[to_remove]
-			for i in self.liveliness_count:
-				self.liveliness_count[i] = self.liveliness_count[i] + 1
+					del self.server.liveliness_count[i]
+					self.server.peer_info.remove(i)
 
+			for i in self.server.liveliness_count:
+				self.server.liveliness_count[i] += 1
 
+	def send_msg(self, msg,addr):
+		# self.server.lock.acquire()
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			s.connect(addr)
+			s.sendall(msg.encode('utf-8'))
+		# self.server.loc/k.release()
 
 def recv_msg(sock):
 	msg = ""
@@ -405,7 +442,8 @@ def Union(lst1, lst2):
 def form_liveliness_req(ip):
 	req = "Alive?"
 	t = datetime.now()
-	req = req + ":" + str(t) + ":" + ip
+	t_str = t.strftime("%d-%m-%Y-%H-%M-%S")
+	req = req + ":" + t_str + ":" + ip
 	return req
 
 def form_liveliness_reply(t, sender_ip, self_ip):
@@ -416,6 +454,7 @@ def form_liveliness_reply(t, sender_ip, self_ip):
 def form_deadNode_msg(addr, self_ip):
 	msg = "Dead Node"
 	t = datetime.now()
+	t_str = t.strftime("%d-%m-%Y-%H-%M-%S")
 	msg = msg + ":" + addr + ":" + str(t) + ":" + self_ip
 	return msg 
 
@@ -435,7 +474,7 @@ def form_gossip_msg( addr, message):
 
 
 def form_reg_msg( addr):
-	msg = "Register"
+	msg = "Register:"
 	msg = msg + addr
 	return msg
 
