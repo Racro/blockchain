@@ -192,7 +192,7 @@ class Peer_Node (threading.Thread):
 		#start gossip
 		peer_gossip_thread = PeerConnection(self,0)
 		peer_gossip_thread.start()
-		# self.peer_threads.append(peer_gossip_thread)		
+		self.peer_threads.append(peer_gossip_thread)		
 		
 		# start liveliness
 		peer_liveliness_thread = PeerConnection(self,1)
@@ -270,12 +270,17 @@ class Peer_Node (threading.Thread):
 	
 
 	def send_msg(self, msg,addr):
-		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			s.connect(addr)
-			s.sendall(msg.encode('utf-8'))
-		s.close()
-
+		try:
+			self.lock.acquire()
+			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+				s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+				s.connect(addr)
+				s.sendall(msg.encode('utf-8'))
+			s.close()
+			self.lock.release()
+		except:
+			self.lock.release()
+			error("couldn't send msg" + msg)
 
 	def recv_msg(self, sock, lock=None):
 		msg = ""
@@ -341,15 +346,15 @@ class PeerConnection (threading.Thread):
 			for i in range(10):
 				msg = form_gossip_msg(self.addr, self.server.message)
 				
-				try:
-					self.server.lock.acquire()
-					self.server.broadcast(msg)
-					self.server.lock.release()
-
-				except:
+				# try:
 					# self.server.lock.acquire()
-					self.server.lock.release()
-					error("coudn't send gossip")
+				self.server.broadcast(msg)
+					# self.server.lock.release()
+
+				# except:
+					# self.server.lock.acquire()
+					# self.server.lock.release()
+				# error("coudn't send gossip")
 					# self.server.lock.release()
 					
 				time.sleep(self.gossip_interval)
@@ -358,13 +363,13 @@ class PeerConnection (threading.Thread):
 			while True:
 				msg = form_liveliness_req(self.server.addr)
 				print(msg)
-				try:
-					self.server.lock.acquire()
-					self.server.broadcast(msg)
-					self.server.lock.release()
-				except:
-					self.server.lock.release()
-					error("coudn't send liveliness")
+				# try:
+					# self.server.lock.acquire()
+				self.server.broadcast(msg)
+					# self.server.lock.release()
+				# except:
+					# self.server.lock.release()
+				# error("coudn't send liveliness")
 
 				time.sleep(self.liveliness_interval)
 				self.check_liveliness()				
@@ -378,7 +383,7 @@ class PeerConnection (threading.Thread):
 				if (self.server.liveliness_count[i] >= 3):
 
 					to_remove.append(i)
-					
+					print(to_remove)
 					for addr in self.server.seed_info:
 						
 						ip = addr.split(":")[0]
@@ -397,12 +402,16 @@ class PeerConnection (threading.Thread):
 				self.server.liveliness_count[i] += 1
 
 	def send_msg(self, msg,addr):
-		# self.server.lock.acquire()
-		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			s.connect(addr)
-			s.sendall(msg.encode('utf-8'))
-		# self.server.loc/k.release()
+		try:
+			self.server.lock.acquire()
+			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+				s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+				s.connect(addr)
+				s.sendall(msg.encode('utf-8'))
+			self.server.lock.release()
+		except:
+			self.server.lock.release()
+			error("couldn't semd msg" + msg)
 
 def recv_msg(sock):
 	msg = ""
