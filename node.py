@@ -478,3 +478,9 @@ def form_reg_msg(addr):
 
 def error(msg):
 	print(msg)
+
+def write_to_file(file, msg):
+	f = open(file, "a+")
+	f.write(msg)
+	f.write("\n")
+	f.close()
