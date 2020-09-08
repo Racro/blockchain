@@ -6,10 +6,9 @@ port = 2005
 message = "Hello"
 
 peer_interval = 5
-num_peer = 5
+num_peer = 4
 peer_list=[]
 
-print(num_peer)
 for i in range(num_peer):
 	print(i)
 	node = Peer_Node(ip, port+i,"Peer"+str(i))
