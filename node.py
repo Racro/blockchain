@@ -75,6 +75,7 @@ class Seed_Node (threading.Thread):
 				print(repr(e))
 				print("Foo")
 				self.stop_server.set()
+		self.server_sock.close()
 
 	def send_msg(self, msg,addr):
 		# print("preparing to sned peer info",msg,addr)
@@ -254,7 +255,7 @@ class Peer_Node (threading.Thread):
 				for i in peer_threads:
 					i.join()
 				self.stop_server.set()
-
+		self.server_sock.close()
 	
 
 	def send_msg(self, msg,addr):
