@@ -1,5 +1,6 @@
 # import socket programming library 
 import socket 
+import time
 
 # import thread module 
 from _thread import *
@@ -31,32 +32,39 @@ def threaded(c):
 
 
 def Main(): 
-	host = "" 
-
+	host = "127.0.0.1" 
 	# reverse a port on your computer 
 	# in our case it is 12345 but it 
 	# can be anything 
 	port = 12345
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-	s.bind((host, port)) 
+	s.bind((host, port))
+	s.settimeout(5) 
 	print("socket binded to port", port) 
 
 	# put the socket into listening mode 
-	s.listen(5) 
+	s.listen(1) 
 	print("socket is listening") 
-	pass
 	# a forever loop until client wants to exit 
 	while True: 
 
-		# establish connection with client 
-		c, addr = s.accept() 
+		# establish connection with client
+		print("starting accept")
+		try: 
+			c, addr = s.accept()
+		except socket.timeout:
+			print("HOLA")
+		print(addr) 
+		buf = c.recv(100)
+		print(repr(buf))
+		time.sleep(20)
 
 		# lock acquired by client 
-		print_lock.acquire() 
-		print('Connected to :', addr[0], ':', addr[1]) 
+		#print_lock.acquire() 
+		#print('Connected to :', addr[0], ':', addr[1]) 
 
 		# Start a new thread and return its identifier 
-		start_new_thread(threaded, (c,)) 
+		#start_new_thread(threaded, (c,)) 
 	s.close() 
 
 

@@ -16,8 +16,11 @@ class Seed_Node (threading.Thread):
 		self.ip = ip
 		self.name = name
 		self.port = port
+		self.addr = (ip,port)
 		self.client_list = []
+		self.file = name + ".txt"
 		# self.client_conn = []
+		self.peer_threads = []
 		self.stop_server = threading.Event()
 		self.init_seed_server()
 
@@ -39,12 +42,13 @@ class Seed_Node (threading.Thread):
 					msg = self.recv_msg(conn)
 					if msg.split(":")[0] == "Register":
 						incoming_addr = (str(msg.split(":")[1]),int(msg.split(":")[2])) #strored as tuple
-						print("Got From peer ",incoming_addr)
+						write_to_terminal(msg)
+						write_to_file(self.file, msg)
 						
 						msg = ""
 						for i in self.client_list:
 							msg = msg + i[0] + ":" + str(i[1]) + " "
-						
+						msg = form_clientList_msg(msg, self.addr)
 						self.send_msg(msg,incoming_addr)
 
 						if incoming_addr not in self.client_list:
@@ -52,16 +56,19 @@ class Seed_Node (threading.Thread):
 
 
 					elif msg.split(":")[0] == "Dead Node":
-						incoming_addr = msg.split(":")[1]
+						incoming_addr = msg.split(":")[1] + ":" + msg.split(":")[2]
 						if incoming_addr in self.client_list:
 							self.client_list.remove(incoming_addr)
-
+						write_to_terminal(msg)
+						write_to_file(self.file, msg)
 				except socket.timeout:
+					error("timeout in seed recv")
 					pass
 
 				except Exception as e:
 					error(e)
 			except socket.timeout:
+				error("timeout in seed accept")
 				pass
 
 			except Exception as e:
@@ -74,7 +81,8 @@ class Seed_Node (threading.Thread):
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.connect(addr)
-			s.sendall(msg.encode('utf-8'))
+			s.sendall(msg.encode('utf-8'))	
+		s.close()
 
 	def recv_msg(self, sock):
 		msg = ""
@@ -88,18 +96,19 @@ class Seed_Node (threading.Thread):
 		return msg
 
 class Peer_Node (threading.Thread):
-	def __init__(self, ip, port, name):
+	def __init__(self, ip, port, message, name):
 		threading.Thread.__init__(self)
 		self.ip = ip
 		self.name = name
 		self.port = int(port)
 		self.addr = ip + ":" + str(port)
 		# self.print_lock = threading.Lock()
-		self.MAXBUF = 1024
-
+		#self.MAXBUF = 1024
+		self.message = message
 		self.peer_info = []
 		self.seed_info = []
 		
+		self.file = name + ".txt"
 		# self.lock = threading.Lock()
 		self.stop_server = threading.Event()
 		self.liveliness_count = {}
@@ -137,13 +146,19 @@ class Peer_Node (threading.Thread):
 		for i in reg_list:
 			ip = i.split(":")[0]
 			port = int(i.split(":")[1])
-			reg_msg = "Register:" + str(self.ip) + ":" + str(self.port)
+			reg_msg = form_reg_msg(str(self.ip) + ":" + str(self.port))
 			addr=(ip,int(port))
 			self.send_msg(reg_msg,addr)
 			
 			#Now receive existing peer data on listner port named server sock
 			conn, addr = self.server_sock.accept()
 			client_list = self.recv_msg(conn)
+			if (client_list.split("-")[0]=="ClientList"):
+				write_to_terminal(client_list)
+				write_to_file(self.file, client_list)
+				client_list = client_list.split("-")[2]
+			else:
+				error("wrong clientList")
 			client_union = Union(client_union, client_list.split(" "))
 				
 		print("Number of peers returned:",len(client_union))	
@@ -159,22 +174,23 @@ class Peer_Node (threading.Thread):
 
 			#Now send self adress to the old established peer
 			addr = (ip,port)
-			reg_msg = "Register:" + str(self.ip) + ":" + str(self.port)
+			reg_msg = form_reg_msg(str(self.ip) + ":" + str(self.port))
 			self.send_msg(reg_msg,addr)
 
-
+			if i not in self.liveliness_count.keys():
+				self.liveliness_count[i] = 0
 
 	def spawn_communication_threads(self):
 		#start gossip
 		peer_gossip_thread = PeerConnection(self,0)
 		peer_gossip_thread.start()
-		
-		#start liveliness
+		self.peer_threads.append(peer_gossip_thread)		
+		# start liveliness
 		# peer_liveliness_thread = PeerConnection(self, peer, 1)
 		# peer_liveliness_thread.start()
 
-		if peer not in self.liveliness_count.keys():
-			self.liveliness_count[peer] = 0
+		# if peer not in self.liveliness_count.keys():
+		# 	self.liveliness_count[peer] = 0
 
 	def run(self):
 		print ("Starting " + self.name)
@@ -208,7 +224,8 @@ class Peer_Node (threading.Thread):
 						# self.server.lock.acquire()
 						if md5 not in self.ML.keys():
 							self.ML[md5] = msg
-
+							write_to_terminal(msg)
+							write_to_file(self.file, msg)
 							#write to file
 							#check for exclusion of address from where recieved gossip msg
 							exclude = []
@@ -223,15 +240,20 @@ class Peer_Node (threading.Thread):
 						error("invalid format")
 						print("*"*20)
 				except socket.timeout:
+					error("timeout in peer recv")
 					pass
 
 				except Exception as e:
 					print(e)
 			except socket.timeout:
+				error("timeout in peer accept")
 				pass
 
 			except Exception as e:
-				sel.stop_server.set()
+				write_to_terminal(e)
+				for i in peer_threads:
+					i.join()
+				self.stop_server.set()
 
 	
 
@@ -240,6 +262,7 @@ class Peer_Node (threading.Thread):
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.connect(addr)
 			s.sendall(msg.encode('utf-8'))
+		s.close()
 
 
 	def recv_msg(self, sock, lock=None):
@@ -299,13 +322,12 @@ class PeerConnection (threading.Thread):
 		self.gossip_interval = 10
 		self.liveliness_interval = 13
 		
-		self.message = "Hello"
 
 	def run(self):
 		
 		if self.flag == 0:
 			for i in range(10):
-				msg = form_gossip_msg(self.addr, self.message)
+				msg = form_gossip_msg(self.addr, self.server.message)
 				self.server.broadcast(msg)
 				time.sleep(self.gossip_interval)
 
@@ -319,23 +341,26 @@ class PeerConnection (threading.Thread):
 			error("wrong flag")
 
 	def check_liveliness (self):
-			to_remove = 0
+			to_remove = []
 			for i in self.server.liveliness_count:
 				if (self.liveliness_count[i] >= 3):
 					#close conn
 
-					to_remove = i
+					to_remove.append(i)
 					for addr in self.server.my_seed_info:
 						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 						sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 						ip = addr.split(":")[0]
 						port = addr.split(":")[1]
 						sock.connect((ip,port))
-						self.send_msg(sock, form_deadNode_msg(self.peer_address, self.ip))
+						self.send_msg(sock, form_deadNode_msg(i, self.addr))
+						write_to_terminal(form_deadNode_msg(i, self.addr))
+						write_to_file(self.server.file, form_deadNode_msg(i, self.addr))
 						sock.close()
 
-			if to_remove != 0:
-				del self.liveliness_count[to_remove]
+			if len(to_remove) != 0:
+				for i in to_remove:
+					del self.liveliness_count[to_remove]
 			for i in self.liveliness_count:
 				self.liveliness_count[i] = self.liveliness_count[i] + 1
 
@@ -390,8 +415,12 @@ def form_liveliness_reply(t, sender_ip, self_ip):
 def form_deadNode_msg(addr, self_ip):
 	msg = "Dead Node"
 	t = datetime.now()
-	msg = msg + ":" + addr + ":" + str(t) + self_ip
+	msg = msg + ":" + addr + ":" + str(t) + ":" + self_ip
 	return msg 
+
+def form_clientList_msg(msg, addr):
+	msg = "ClientList-"+str(addr)+"-"+msg
+	return msg
 
 def error(msg):
 	print(msg)
@@ -414,4 +443,13 @@ def send_msg( sock, msg):
 	try:
 		sock.send(msg)
 	except:
-		error()
+		error("can't send msg")
+
+def write_to_file(file, msg):
+	f = open(file, "a+")
+	f.write(msg)
+	f.write("\n")
+	f.close()
+
+def write_to_terminal(msg):
+	print(msg)

@@ -11,7 +11,7 @@ peer_list=[]
 
 for i in range(num_peer):
 	print(i)
-	node = Peer_Node(ip, port+i,"Peer"+str(i))
+	node = Peer_Node(ip, port+i, message, "Peer"+str(i))
 	node.start()
 	peer_list.append(node)
 
