@@ -43,7 +43,7 @@ class Seed_Node (threading.Thread):
 						for i in self.client_list:
 							msg = msg + i[0] + ":" + str(i[1]) + " "
 						
-#############						self.send_info(msg,incoming_addr)
+						self.send_info(msg,incoming_addr)
 
 						if incoming_addr not in self.client_list:
 							self.client_list.append(incoming_addr)
@@ -70,6 +70,7 @@ class Seed_Node (threading.Thread):
 	def send_info(self, msg,addr):
 		# print("preparing to sned peer info",msg,addr)
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.connect(addr)
 			s.sendall(msg.encode('utf-8'))
 
@@ -141,7 +142,7 @@ class Peer_Node (threading.Thread):
 			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
 				ip = i.split(":")[0]
 				port = int(i.split(":")[1])
-				sock.connect((ip,port))
+				sock.connect((ip,int(port)))
 				reg_msg = "Peer Data:" + str(self.ip) + ":" + str(self.port)
 
 				sock.send_msg(sock, reg_msg.encode('utf-8'))
@@ -257,7 +258,7 @@ class Peer_Node (threading.Thread):
 			self.liveliness_count[peer] = 0
 
 	def connect(self, ip, port):
-		self.client_sock.connect((ip,port))
+		self.client_sock.connect((ip,int(port)))
 
 	def accept(self):
 		conn, addr = self.server_sock.accept()
@@ -278,7 +279,7 @@ class Peer_Node (threading.Thread):
 		return msg
 
 	def send_msg(self, sock, msg):
-		sock.send(msg)
+		sock.send(msg.encode('utf-8'))
 
 	def send_all (self, msg, exclude=[]):
 		# for i in self.my_in_peers:
@@ -288,7 +289,7 @@ class Peer_Node (threading.Thread):
 			if i not in exclude:
 				sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 				sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-				sock.connect((i.split(":")[0], i.split(":")[1]))
+				sock.connect((i.split(":")[0], int(i.split(":")[1])))
 				self.send_msg(sock, msg)
 
 
@@ -341,7 +342,7 @@ class PeerConnection (threading.Thread):
 						sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 						ip = addr.split(":")[0]
 						port = addr.split(":")[1]
-						sock.connect((ip,port))
+						sock.connect((ip,int(port)))
 						self.send_msg(sock, form_deadNode_msg(self.peer_address, self.ip))
 						sock.close()
 
@@ -383,7 +384,7 @@ class PeerConnection (threading.Thread):
 		# 		error("invalid format")
 	def send_msg(self, sock, msg):
 		try:
-			sock.send(msg)
+			sock.send(msg.encode('utf-8'))
 		except:
 			error()
 
