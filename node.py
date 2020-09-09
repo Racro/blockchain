@@ -5,10 +5,9 @@ import socket
 import time
 import hashlib
 
-filename = "config.txt"
+filename = "config.csv"
 MAXBUF = 1024
-#Handle dead nodes
-#peer port is not same
+
 class Seed_Node (threading.Thread):
 	def __init__(self, ip, port, name=""):
 

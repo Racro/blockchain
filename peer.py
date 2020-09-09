@@ -1,50 +1,29 @@
-from datetime import datetime
 from node import Peer_Node
 import argparse
 
-ip = "192.168.1.152"
+def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--adlist',default="127.0.0.1:2000,127.0.0.1:2001",  type=str, help='List of adress - ip1:port1,ip2:port2..')
+	parser.add_argument('--msglist',default="Gossip1,Gossip2",  type=str, help='List of gossip messages - msg1,msg2..')
+	args = parser.parse_args()
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--port_list',  type=str, help='Port list')
-# parser.add_argument('--msg_list',  type=str, help='Port list')
+	address_list = args.adlist.split(",")
+	message_list = args.msglist.split(",")
+	assert len(address_list) == len(message_list)
+	num_peer = len(address_list)
 
-# parser.add_argument('--sum', dest='accumulate', action='store_const',
-#                     const=sum, default=max,
-#                     help='sum the integers (default: find the max)')
+	peerList = []
+	for i in range(num_peer):
+		ip,port = address_list[i].split(":")
+		name = "Peer-"+ port
+		file = open(name+".txt",'w')
+		file.close()
+		peerNode = Peer_Node(ip, port, message_list[i], name)
+		peerNode.start()
+		peerList.append(peerNode)
 
-message = "Hello"
+	for thread in peerList:
+		thread.join()
 
-port = int(input("port: "))
-
-peer_interval = 5 
-num_peer = 1
-peer_list=[]
-
-
-for i in range(num_peer):
-	print(i)
-
-	file = open("Peer"+str(i)+".txt",'w')
-	file.close()
-
-	node = Peer_Node(ip, port, message + str(port), "Peer"+str(port))
-	node.start()
-	peer_list.append(node)
-
-for thread in peer_list:
-	thread.join()
-exit(0)
-
-def form_msg(ip, message):
-	msg = ""
-	t = datetime.now()
-	msg = msg + t + ":" + ip + ":" + message
-	return msg
-
-
-for i in range(10):
-	msg = form_msg(ip, message)
-	node.sendall(msg)
-	time.sleep(peer_interval)
-
-time.sleep(10)
+if __name__ == "__main__":
+	main()
