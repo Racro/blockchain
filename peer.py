@@ -4,7 +4,7 @@ import argparse
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--adlist',default="127.0.0.1:2000,127.0.0.1:2001",  type=str, help='List of adress - ip1:port1,ip2:port2..')
-	parser.add_argument('--msglist',default="Gossip1,Gossip2",  type=str, help='List of gossip messages - msg1,msg2..')
+	parser.add_argument('--msglist',default="Gossip,Hello",  type=str, help='List of gossip messages - msg1,msg2..')
 	args = parser.parse_args()
 
 	address_list = args.adlist.split(",")
