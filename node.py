@@ -236,8 +236,9 @@ class Peer_Node (threading.Thread):
 						# self.server.lock.acquire()
 						if md5 not in self.ML.keys():
 							self.ML[md5] = True
-							write_to_terminal(msg)
-							write_to_file(self.file, msg)
+							print_msg = str(datetime.now()) + ":" + incoming_addr + ":" + message[-1] 
+							write_to_terminal(print_msg)
+							write_to_file(self.file, print_msg)
 							#write to file
 							#check for exclusion of address from where recieved gossip msg
 							
