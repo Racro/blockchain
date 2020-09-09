@@ -1,6 +1,8 @@
 # blockchain
 Assignment - CS765 
 
+
+
 ## Config file
 `IP` and `Port` of seed nodes __Hard-Coded__
 
@@ -31,3 +33,8 @@ If 3 consecutive liveness messages are not replied to, the node will notify the 
 ## Reporting the node as ’Dead’
 When 3 consecutive liveness requests do not receive a reply, the peer sends a message of the following format to all the seeds it is connected to:
 `Dead Node`:`DeadNode.IP`:`self.timestamp`:`self.IP`
+
+## How to Run
+__Terminal1 (seed)__ `python3 seed.py 0 1` (creates 2 seed threads using lines 0-1 of config.csv)
+__Terminal2 (peer)__ `python3 peer.py` (creates 2 peer threads by default on localhost)  
+
