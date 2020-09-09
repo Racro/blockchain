@@ -28,7 +28,7 @@ class Seed_Node (threading.Thread):
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.server_sock.bind((self.ip, self.port))		# Bind to the port
 		# self.server_sock.settimeout(10.0)
-		self.server_sock.listen(5)				 # Now wait for client connection (max 5 clients)
+		self.server_sock.listen()				 # Now wait for client connection (max 5 clients)
 
 	def run(self):
 		print ("Starting " + self.name)
@@ -129,7 +129,7 @@ class Peer_Node (threading.Thread):
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.server_sock.bind((self.ip, self.port))		# Bind to the port
 		# self.server_sock.settimeout(10.0)
-		self.server_sock.listen(5)				 # Now wait for client connection (max 5 clients)
+		self.server_sock.listen()				 # Now wait for client connection (max 5 clients)
 
 		#write to file and register node
 		self.register_with_seed()
@@ -172,7 +172,7 @@ class Peer_Node (threading.Thread):
 		# print("Number of peers returned:",len(client_union))	
 		# print(client_union)
 		self.peer_info = random.sample(client_union, min(4,len(client_union)))
-		
+		print(self.peer_info)
 
 	def register_with_peer(self):
 		for i in self.peer_info:
@@ -345,7 +345,7 @@ class PeerConnection (threading.Thread):
 		if self.flag == 0:
 			for i in range(10):
 				msg = form_gossip_msg(self.addr, self.server.message + str(i), 0)
-				print(i,msg)
+				# print(i,msg)
 				self.broadcast(msg)					
 				time.sleep(self.gossip_interval)
 
@@ -386,11 +386,11 @@ class PeerConnection (threading.Thread):
 			# self.server.lock.acquire()
 			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 				s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-				print("*"*10)
+				# print("*"*10)
 				
 				s.connect(addr)
-				print("#"*10)
-				
+				# print("#"*10)
+
 				s.sendall(msg.encode('utf-8'))
 			# self.server.lock.release()
 		except Exception as e:
