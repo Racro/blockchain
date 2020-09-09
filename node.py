@@ -230,18 +230,20 @@ class Peer_Node (threading.Thread):
 
 					elif self.gossip(msg):
 						#reply
-						message = msg.split(":")[3] 
+						message = msg.split(":")[:4]
+						incoming_addr = msg.split(":")[-2:]
 						md5 = hashlib.md5(message.encode()).hexdigest()
 						# self.server.lock.acquire()
 						if md5 not in self.ML.keys():
-							self.ML[md5] = msg
+							self.ML[md5] = True
 							write_to_terminal(msg)
 							write_to_file(self.file, msg)
 							#write to file
 							#check for exclusion of address from where recieved gossip msg
+							
 							exclude = []
 							exclude.append(incoming_addr)
-							msg = form_gossip_msg(self.addr,message)
+							msg = form_gossip_msg(self.addr, message, 1)
 							self.broadcast(msg, exclude)
 
 						# self.server.lock.release()
@@ -343,7 +345,7 @@ class PeerConnection (threading.Thread):
 		
 		if self.flag == 0:
 			for i in range(10):
-				msg = form_gossip_msg(self.addr, self.server.message)
+				msg = form_gossip_msg(self.addr, self.server.message, 0)
 				
 				# try:
 					# self.server.lock.acquire()
@@ -474,11 +476,17 @@ def error(msg):
 	print(msg)
 
 
-def form_gossip_msg( addr, message):
-	t = datetime.now()
-	t_str = t.strftime("%d-%m-%Y-%H-%M-%S")
-	msg = t_str + ":" + addr + ":" + message
-	return msg
+def form_gossip_msg( self_addr, message, flag):
+	if (flag == 0):
+		t = datetime.now()
+		t_str = t.strftime("%d-%m-%Y-%H-%M-%S")
+		msg = t_str + ":" + self_addr + ":" + message + ":" + self_addr
+		return msg
+	elif (flag == 1):
+		msg = message + ":" + self_addr
+		return msg
+	else:
+		error("wrong flag in gossip")
 
 
 def form_reg_msg( addr):
