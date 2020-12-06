@@ -18,7 +18,7 @@ def main():
 		name = "Peer-"+ port
 		file = open(name+".txt",'w')
 		file.close()
-		peerNode = Peer_Node(ip, port, message_list[i], name)
+		peerNode = Peer_Node(ip, port, message_list[i], name, hashPower,0)
 		peerNode.start()
 		peerList.append(peerNode)
 

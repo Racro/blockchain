@@ -1,8 +1,6 @@
 # blockchain
 Assignment - CS765 
 
-
-
 ## Config file
 `IP` and `Port` of seed nodes __Hard-Coded__
 
