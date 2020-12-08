@@ -4,7 +4,7 @@ from datetime import datetime
 import socket
 import time
 import hashlib
-from random import random
+import random
 import math
 import ast
 import numpy
@@ -13,8 +13,6 @@ filename = "config.csv"
 MAXBUF = 1024
 h = hashlib.sha3_256() 
 
-inter_arrival = 10
-global_lambda = 1/inter_arrival
 
 genesis_hash = "9e1c"
 
@@ -110,29 +108,33 @@ class Seed_Node (threading.Thread):
 		return msg
 
 class Peer_Node (threading.Thread):
-	def __init__(self, ip, port, message, name, hashPower, is_adversary):
+	def __init__(self, ip, port, message, name, hashPower, is_adversary,inter_arrival_time=10,iter=0,draw_tree=False):
 		threading.Thread.__init__(self)
 		self.ip = ip
 		self.name = name
 		self.port = int(port)
 		self.addr = ip + ":" + str(port)
 		self.is_adversary = is_adversary
-		# self.print_lock = threading.Lock()
+		self.draw_tree = draw_tree
+
+		self.inter_arrival = inter_arrival_time
+		self.global_lambda = 1/inter_arrival_time
 		
 		#self.MAXBUF = 1024
 		self.database = {}
-		self.database[0] = [(genesis_hash, 0, 0)]
-		self.cur_len = len(self.database)
+		self.database[0] = [([genesis_hash, 0, 0],-1,0)]
+		self.cur_length = 1
 		self.hashPower = hashPower
-		self.lamb = (self.hashPower * global_lambda)/100
+		self.lamb = (self.hashPower * self.global_lambda)/100
 		
 		self.pending_queue = []
 
 		self.message = message
 		self.peer_info = []
 		self.seed_info = []
+		self.iter=iter
 		
-		self.file = name + ".txt"
+		self.file = name+".txt"
 		self.lock = threading.Lock()
 		self.pending_lock = threading.Lock()
 		self.stop_server = threading.Event()
@@ -142,6 +144,8 @@ class Peer_Node (threading.Thread):
 		self.peer_threads = []
 		#self.conn_to_ip = {}
 		self.make_socket()
+
+		self.broadcast_dict={}
 
 	def make_socket(self):
 		
@@ -192,12 +196,12 @@ class Peer_Node (threading.Thread):
 				
 		# print("Number of peers returned:",len(client_union))	
 		# print(client_union)
-		self.peer_info = random.sample(client_union, min(4,len(client_union)))
+		self.peer_info = random.sample(client_union, min(2,len(client_union)))
 		print(self.peer_info)
 
 	def register_with_peer(self):
 		Bk = []
-		conn = []
+		conn_list = []
 		for i in self.peer_info:
 			ip,port = i.split(":")[0],int(i.split(":")[1])
 			if (ip==self.ip and port==self.port):
@@ -210,25 +214,41 @@ class Peer_Node (threading.Thread):
 			reg_msg = form_reg_msg(str(self.ip) + ":" + str(self.port))
 			self.send_msg(reg_msg,addr)
 
+			# print("reg/msg sent by",self.name)
 			if i not in self.liveliness_count.keys():
 				self.liveliness_count[i] = 0
 
 			#receiving Bk node
-			while(true):
+			while(True):
 				conn, incoming_addr = self.server_sock.accept()
+				# print("wait sent by",self.name)
+
 				msg = self.recv_msg(conn)
+				# print("Stuck")
+				# print(msg)
+
 				if self.Bk_req(msg):
+					# print("yoohoo")
 					Bk.append((ast.literal_eval(msg.split(":")[1]), int(msg.split(":")[2])))
-					conn.append((msg.split(":")[-2], int(msg.split(":")[-1])))
+					conn_list.append((msg.split(":")[-2], int(msg.split(":")[-1])))
 					break
-		latest_time = self.Bk[0][0][2]
+				elif msg=="":
+					print("No blocks in bkc yet")
+					break
+
+		if len(Bk) == 0:
+			return
+		print(Bk)
+		# exit(0)
+
+		latest_time = Bk[0][0][2]
 		blk = Bk[0]
-		con = conn[0]
-		for i in range(1, len(self.Bk)):
+		con = conn_list[0]
+		for i in range(1, len(Bk)):
 			if(Bk[i][0][2] > latest_time):
 				latest_time = Bk[i][0][2]
 				blk = Bk[i]
-				con = conn[i]
+				con = conn_list[i]
 		self.pending_lock.acquire()
 		self.pending_queue.append((blk[0], con))  #need to find k and trim blk to block header
 		self.pending_lock.release()
@@ -243,27 +263,36 @@ class Peer_Node (threading.Thread):
 		# self.peer_threads.append(peer_gossip_thread)		
 		if not self.is_adversary:
 			# start liveliness
-			peer_liveliness_thread = PeerConnection(self,1)
-			peer_liveliness_thread.start()
-			self.peer_threads.append(peer_liveliness_thread)		
+			# peer_liveliness_thread = PeerConnection(self,1)
+			# peer_liveliness_thread.start()
+			# self.peer_threads.append(peer_liveliness_thread)		
 
 			#Setup for new node must be complete at this point
 
+			print("start mining thread")
 			#Start Honest Node Mining process
 			peer_mining_thread = PeerConnection(self,2)
+			peer_mining_thread.start()
+			self.peer_threads.append(peer_mining_thread)		
+
 		else:
 			# start liveliness
-			peer_liveliness_thread = PeerConnection(self,1)
-			peer_liveliness_thread.start()
-			self.peer_threads.append(peer_liveliness_thread)		
+			# peer_liveliness_thread = PeerConnection(self,1)
+			# peer_liveliness_thread.start()
+			# self.peer_threads.append(peer_liveliness_thread)		
 
 			#Setup for new node must be complete at this point
 
 			#Start Honest Node Mining process
 			peer_mining_thread = PeerConnection(self,2)
-
+			peer_mining_thread.start()
 			#adversarial random block generation
 			adversary_thread = PeerConnection(self,3)
+			adversary_thread.start()
+
+			self.peer_threads.append(peer_mining_thread)
+			self.peer_threads.append(adversary_thread)		
+
 
 
 	def run(self):
@@ -275,14 +304,17 @@ class Peer_Node (threading.Thread):
 				try:
 					msg = self.recv_msg(conn)
 
-					# print("MESSAGE RECIEVED:",msg)
+					# print("MESSAGE RECIEVED:",msg,"by",self.name)
 
 					if self.register_msg(msg):
 						addr = msg.split(":")[1]+":"+msg.split(":")[2]
 						if addr not in self.peer_info:
 							self.peer_info.append(addr)
 						k = len(self.database.keys()) - 1
-						reply = form_Bk_msg(self.database[k], k, self.addr)
+						if (k > 0):
+							reply = form_Bk_msg(self.database[k], k, self.addr)
+						else:
+							reply = ""
 						addr = (msg.split(":")[1], int(msg.split(":")[2]))
 						self.send_msg(reply, addr)
 
@@ -299,6 +331,7 @@ class Peer_Node (threading.Thread):
 
 					elif self.gossip(msg):
 						#reply
+						# print("Goo")
 						message = msg.split(":")[0]+":"+msg.split(":")[1]+":"+msg.split(":")[2]+":"+msg.split(":")[3]
 						incoming_addr = msg.split(":")[-2] + ":" + msg.split(":")[-1]
 						md5 = hashlib.md5(message.encode()).hexdigest()
@@ -325,8 +358,7 @@ class Peer_Node (threading.Thread):
 						send_lst = []
 						for i in range(k-1,-1,-1):
 							for j in self.database[i]:
-								h.update(str(j[0]).encode())
-								hsh = h.hexdigest()[0:4]
+								hsh = sha3[j[0]]
 								if(hsh == prev_hash):
 									prev_hash = hsh
 									send_lst.append(j)
@@ -341,11 +373,18 @@ class Peer_Node (threading.Thread):
 							self.database[i] = lst[i]
 					
 					elif self.block_msg(msg):
+						# print("Recieved block********************")
 						blk = ast.literal_eval(msg.split(":")[1])
 						incoming_addr = msg.split(":")[-2] + ":" + msg.split(":")[-1]
 						#acquire_lock for pending queue
 						self.pending_lock.acquire()
-						self.pending_queue.append((blk, incoming_addr))
+						exists=False
+						for item in self.pending_queue:
+							if item[0] == blk:
+								exists=True
+								break
+						if not exists:
+							self.pending_queue.append((blk, incoming_addr))
 						self.pending_lock.release()
 
 					else:
@@ -395,7 +434,8 @@ class Peer_Node (threading.Thread):
 			if i not in exclude:
 				addr = (i.split(":")[0], int(i.split(":")[1]))
 				self.send_msg(msg,addr)
-
+		print("Broadcast complete")
+		
 	def register_msg(self, msg):
 
 		# print(msg)
@@ -419,8 +459,11 @@ class Peer_Node (threading.Thread):
 
 	def gossip(self, msg):
 		check=0
-		time = datetime.strptime(msg.split(":")[0], '%d-%m-%Y-%H-%M-%S')
-		check=1
+		try:	
+			time = datetime.strptime(msg.split(":")[0], '%d-%m-%Y-%H-%M-%S')
+			check=1
+		except:
+			pass
 	
 		return check
 	
@@ -453,25 +496,53 @@ class Peer_Node (threading.Thread):
 		parent_index = 0
 		longest_chain = []
 		my_nodes = 0
+		count_adv_nodes=0
 		
-		for i in range(len(self.database)-1,-1,-1):
-			if (self.database[i][parent_index][2] == 1)
+		for i in range(self.cur_length-1,-1,-1):
+			if (self.database[i][parent_index][2] == 1):
 				my_nodes+=1
+			if (self.database[i][parent_index][0][1] == "ffff"):
+				count_adv_nodes+=1
+
 			longest_chain.append(self.database[i][parent_index])
+			parent_index = self.database[i][parent_index][1]
 			count_total_nodes += len(self.database[i])
 
-		return [count_total_nodes, my_nodes, len(self.database)]	
+		return [count_total_nodes, my_nodes, len(self.database), count_adv_nodes]	
 	
 	def validate(self,block):
-		for h,bl in self.database:
-			for i in range(len(bl)):
-				bt = bl[i]
-				h.update(str(bl).encode())
-				hsh = h.hexdigest()[0:4]
+		for height,bil in self.database.items():
+			for i in range(len(bil)):
+				# print(bil,"vali")
+				bt = bil[i]
+				# print(bt[0])
+
+				# h.update(str(bt[0]).encode())
+				hsh = sha3(bt[0])
+				# print(hsh)
+				# print(block)
+				# print("error?")
 				if (block[0] == hsh):
-					return[h,i]
+					return[height,i]
 
 		return [-1,-1]
+
+	def construct_tree(self):
+		print("Here")
+		num_tabs = 1
+		print('\t'*num_tabs)
+		max_level = self.cur_length-1
+		for i in range(max_level):
+			bfl = self.database[i]
+			print("\t"*num_tabs,str(i)+":",end="")
+			num_tabs+=1
+			i=0
+			for bi in bfl:
+				print("\t"*(num_tabs+i),bi[0],"parent index:", bi[1])
+				if i==0:
+					i+=1
+				
+			num_tabs-=1
 					
 
 
@@ -503,43 +574,101 @@ class PeerConnection (threading.Thread):
 				self.check_liveliness()
 								
 		elif self.flag == 2:
+			self.begin = time.time()
+			timeout = self.begin + 60*5
 			# Mining Thread
-			h.update(str(self.server.database[self.server.cur_length-1][0][0]).encode())
-			hsh = h.hexdigest()[0:4]
-			block=gen_block_header(hsh)
-			waitingTime = numpy.random.exponential(1/self.lamb)
-			time.sleep(waitingTime)
-			self.mining_process(block)	
+			while time.time() < timeout:
+				# print("Mining Started")
+				# print(self.server.database[self.server.cur_length-1][0][0])
+				# h.update(str(self.server.database[self.server.cur_length-1][0][0]).encode())
+				hsh = sha3(self.server.database[self.server.cur_length-1][0][0])
+				# print("new-prev",hsh)
+				block=gen_block_header(hsh)
+				waitingTime = numpy.random.exponential(1/self.server.lamb)
+				time.sleep(max(waitingTime,0))
+				statement = "Sleep of "+str(max(waitingTime,0))+" By:"+self.server.name+" Time:"+str((time.time()-self.begin)/60)
+				# print("Sleep of",waitingTime,"completed", self.server.name, "time:",str(time.time()-begin)/60)
+				write_to_terminal(statement)
+				write_to_file(self.server.file,statement)
+
+				self.mining_process(block)
+				print("Mining Cycle completed. Time:",(time.time()-self.begin)/60)
+
+			write_to_file(self.server.file,"blockchain stats")
+			write_to_terminal("blockchain stats")
+			# for key,values in self.server.database.items():
+			# 	write_to_file(self.server.file,str(key) + " " + str(len(values)))
+			# 	write_to_terminal(str(key) + " " + str(len(values)))
+			stats = self.server.longest_chain_stats()
+			statement = "Nodes in db:"+str(stats[0])+",longest chain:"+str(stats[2])+",my nodes:"+str(stats[1])+",hashingPower:"+str(self.server.hashPower)+",adv-nodes:"+str(stats[3])
+			write_to_file(self.server.file,statement)
+			write_to_terminal(statement)
+			# print(statement)
+
+			if self.server.draw_tree:
+				self.server.construct_tree()
+
+			# print("Done")
 		
 		elif self.flag == 3:
 			#adversary thread
-			time.sleep(2) #2 is some random
-			block=gen_block_header("0"*16)
-			self.broadcast(block)
+			print("Adversary is now flooding neighbours every 2 second")
+			while(True):
+				time.sleep(2) #2 is some random
+				block=gen_block_header("0"*4)
+				blk_msg = form_block_msg(block, self.addr)
+				self.broadcast(blk_msg)
 		else:
 			error("wrong flag")
 	
-	def mining_process(self):
+	def mining_process(self,block):
+		hsh= sha3(block)
 		if len(self.server.pending_queue) == 0:
+			if self.server.is_adversary:
+				block[1] = "ffff"
 			blk_msg = form_block_msg(block, self.addr)
 			self.broadcast(blk_msg)
 			tup = (block,0,1)
-			self.server.database[self.server.cur_length+1] = [tup]
+			self.server.database[self.server.cur_length] = [tup]
+			hs= sha3(block)
+			self.server.broadcast_dict[hs]=1
+
+			statement = "Broadcasted mined block "+str(tup)+" By:"+self.server.name+" Time:"+str((time.time()-self.begin)/60)
+			write_to_file(self.server.file,statement)
+			write_to_terminal(statement)
+
+			self.server.cur_length+=1
 		else:
-			self.update_database()
-	
+			if not hsh in self.server.broadcast_dict:
+				self.update_database()
+				self.server.broadcast_dict[hsh] = 1
+
 	def update_database(self):
-		#assume genesis block is present
-		for _ in range(len(self.server.pending_queue))):
-			for block,addr in self.server.pending_queue:
+		print("Length of pending que is",len(self.server.pending_queue))
+		for _ in range(len(self.server.pending_queue)):
+			for item in self.server.pending_queue:
+				block = item[0]
+				addr = item[1]
 				[h,i] = self.server.validate(block)
 				if h!=-1:
 					block_info = (block,i,0)
-					self.server.database[k-1].append(block_info)
-					self.server.pending_queue.remove(block)
 					blk_msg = form_block_msg(block, self.addr)
 					self.broadcast(blk_msg,[addr])
-					break
+
+					if h==self.server.cur_length-1:
+						self.server.database[self.server.cur_length]= [block_info]
+						self.server.cur_length+=1
+					else:
+						exists=False
+						for bi in self.server.database[h+1]:
+							if bi[0] == block:
+								exists=True
+								break
+						if not exists:
+							self.server.database[h+1].append(block_info)
+					self.server.pending_queue.remove(item)
+		
+		print("Update complete", self.server.name)
 		self.server.pending_queue = []
 
 			
@@ -684,8 +813,15 @@ def write_to_file(file, msg):
 def write_to_terminal(msg):
 	print(msg)
 
-def gen_block_header(self, prev_hash):
-	h.update(str(random()).encode())
-	hsh = h.hexdigest()[0:4]
-	block = [prev_hash, hsh, floor(time.time())]
+def gen_block_header(prev_hash):
+	# h.update(str(random.random()).encode())
+	hsh = sha3(random.random())
+
+	block = [prev_hash, hsh, math.floor(time.time())]
 	return block
+
+def sha3(block):
+	s = hashlib.sha3_224() 
+	s.update(str(block).encode())
+	hsh = s.hexdigest()[0:4]
+	return hsh 

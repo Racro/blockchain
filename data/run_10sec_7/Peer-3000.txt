@@ -1,0 +1,49 @@
+ClientList-('127.0.0.1', 8001)-127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 
+ClientList-('127.0.0.1', 8000)-127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 
+Sleep of 38.478370449541266 By:Peer-3000 Time:0.6419257521629333
+Broadcasted mined block (['7349', 'ffff', 1607431702], 0, 1) By:Peer-3000 Time:0.6419549306233724
+Sleep of 87.40364183879088 By:Peer-3000 Time:2.1001261909802755
+Broadcasted mined block (['4bc9', 'ffff', 1607431741], 0, 1) By:Peer-3000 Time:2.100156048933665
+Sleep of 22.128392401285222 By:Peer-3000 Time:2.469326357046763
+Broadcasted mined block (['0b4a', 'ffff', 1607431828], 0, 1) By:Peer-3000 Time:2.4693507591883344
+Sleep of 11.891824174682771 By:Peer-3000 Time:2.6677260796229043
+Broadcasted mined block (['ff47', 'ffff', 1607431850], 0, 1) By:Peer-3000 Time:2.667740837732951
+Sleep of 5.214362987382395 By:Peer-3000 Time:2.754725190003713
+Broadcasted mined block (['51f6', 'ffff', 1607431862], 0, 1) By:Peer-3000 Time:2.7547492464383443
+Sleep of 21.83897129765183 By:Peer-3000 Time:3.119059979915619
+Broadcasted mined block (['ea72', 'ffff', 1607431868], 0, 1) By:Peer-3000 Time:3.119081501166026
+Sleep of 32.25023751266897 By:Peer-3000 Time:3.6569416721661887
+Broadcasted mined block (['b28a', 'ffff', 1607431889], 0, 1) By:Peer-3000 Time:3.6569669008255006
+Sleep of 4.001423077440491 By:Peer-3000 Time:3.7237270991007487
+Broadcasted mined block (['0cc5', 'ffff', 1607431922], 0, 1) By:Peer-3000 Time:3.723752041657766
+Sleep of 4.7396163595977345 By:Peer-3000 Time:3.80279229482015
+Broadcasted mined block (['2068', 'ffff', 1607431926], 0, 1) By:Peer-3000 Time:3.802807064851125
+Sleep of 56.33526193557647 By:Peer-3000 Time:4.742240730921427
+Sleep of 0.49330127902861076 By:Peer-3000 Time:4.7505295991897585
+Broadcasted mined block (['7674', 'ffff', 1607431987], 0, 1) By:Peer-3000 Time:4.750556492805481
+Sleep of 71.7764955837663 By:Peer-3000 Time:5.948008588949839
+Sleep of 6.268456395771243 By:Peer-3000 Time:6.052557321389516
+Broadcasted mined block (['7aea', 'ffff', 1607432059], 0, 1) By:Peer-3000 Time:6.05256876150767
+Sleep of 12.99434044979023 By:Peer-3000 Time:6.269261225064596
+Broadcasted mined block (['d0ff', 'ffff', 1607432065], 0, 1) By:Peer-3000 Time:6.269286175568898
+Sleep of 41.067871339832486 By:Peer-3000 Time:6.954270168145498
+Sleep of 82.47564563550087 By:Peer-3000 Time:8.330324212710062
+Broadcasted mined block (['68a9', 'ffff', 1607432120], 0, 1) By:Peer-3000 Time:8.330347204208374
+Sleep of 12.971674022964471 By:Peer-3000 Time:8.546658837795258
+Broadcasted mined block (['4724', 'ffff', 1607432202], 0, 1) By:Peer-3000 Time:8.546677859624227
+Sleep of 12.13414652965939 By:Peer-3000 Time:8.749131254355113
+Broadcasted mined block (['1628', 'ffff', 1607432215], 0, 1) By:Peer-3000 Time:8.749157122770946
+Sleep of 15.079030538519755 By:Peer-3000 Time:9.000733137130737
+Broadcasted mined block (['d3e2', 'ffff', 1607432227], 0, 1) By:Peer-3000 Time:9.000756831963857
+Sleep of 2.836650055752534 By:Peer-3000 Time:9.048148341973622
+Broadcasted mined block (['d908', 'ffff', 1607432242], 0, 1) By:Peer-3000 Time:9.048172914981842
+Sleep of 6.029759236370853 By:Peer-3000 Time:9.148785297075907
+Broadcasted mined block (['b142', 'ffff', 1607432245], 0, 1) By:Peer-3000 Time:9.148809834321339
+Sleep of 32.47239272218345 By:Peer-3000 Time:9.690292731920879
+Broadcasted mined block (['4585', 'ffff', 1607432251], 0, 1) By:Peer-3000 Time:9.690319534142812
+Sleep of 4.734252389877316 By:Peer-3000 Time:9.769320877393087
+Broadcasted mined block (['ecf6', 'ffff', 1607432284], 0, 1) By:Peer-3000 Time:9.769347620010375
+Sleep of 14.306913797758707 By:Peer-3000 Time:10.007993312676748
+Broadcasted mined block (['e160', 'ffff', 1607432288], 0, 1) By:Peer-3000 Time:10.008020174503326
+blockchain stats
+Nodes in db:31,longest chain:23,my nodes:21,hashingPower:33.0,adv-nodes:21

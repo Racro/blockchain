@@ -1,0 +1,5 @@
+ClientList-('127.0.0.1', 8000)-
+ClientList-('127.0.0.1', 8001)-
+Sleep of 779.7725316793326 By:Peer-2000 Time:12.997859748204549
+blockchain stats
+Nodes in db:34,longest chain:17,my nodes:0,hashingPower:6.7,adv-nodes:15
