@@ -1,0 +1,10 @@
+ClientList-('127.0.0.1', 8001)-
+ClientList-('127.0.0.1', 8000)-
+Sleep of 307.816531900259 By:Peer-2000 Time:5.131909350554149
+Sleep of 146.08634668919265 By:Peer-2000 Time:7.568837543328603
+Sleep of 78.148514070901 By:Peer-2000 Time:8.873643398284912
+Sleep of 6.885665988568161 By:Peer-2000 Time:8.989377252260844
+Broadcasted mined block (['72d9', '52bb', 1607432230], 0, 1) By:Peer-2000 Time:8.98947993516922
+Sleep of 126.31034997599225 By:Peer-2000 Time:11.096310210227966
+blockchain stats
+Nodes in db:37,longest chain:23,my nodes:0,hashingPower:9.571428571428571,adv-nodes:21
